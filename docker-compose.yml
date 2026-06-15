@@ -1,0 +1,62 @@
+services:
+  # 1. Cơ sở dữ liệu MySQL
+  auth-db:
+    image: mysql:8.0
+    container_name: security_auth_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password_123
+      MYSQL_DATABASE: identity_provider_db
+      MYSQL_USER: security_user
+      MYSQL_PASSWORD: user_password_123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # Nạp tự động file SQL khởi tạo
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ctf_security_network
+
+  # 2. Máy chủ cấp quyền
+  auth-server:
+    build:
+      context: ./auth-server
+    container_name: security_auth_server
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DB_HOST=auth-db # Trỏ thẳng tên container MySQL
+      - DB_USER=security_user
+      - DB_PASSWORD=user_password_123
+      - DB_NAME=identity_provider_db
+    depends_on:
+      - auth-db
+    networks:
+      - ctf_security_network
+
+  # 3. Máy chủ tài nguyên
+  resource-server:
+    build:
+      context: ./resource-server
+    container_name: security_resource_server
+    restart: always
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      # Gọi sang Auth Server bằng tên container nội bộ
+      - JWKS_URL=http://auth-server:3000/.well-known/jwks.json 
+    depends_on:
+      - auth-server
+    networks:
+      - ctf_security_network
+
+volumes:
+  mysql_data:
+
+networks:
+  ctf_security_network:
+    driver: bridge

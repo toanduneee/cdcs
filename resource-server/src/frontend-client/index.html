@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Xác Thực RS256</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+        <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Hệ Thống API Bảo Mật</h2>
+
+        <div id="login-section">
+            <h3 class="text-lg font-semibold mb-4 text-blue-600">1. Xác thực (Auth Server)</h3>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Tên đăng nhập</label>
+                    <input type="text" id="username" value="admin" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Mật khẩu</label>
+                    <input type="password" id="password" value="password123" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Lấy Token (Đăng nhập)
+                </button>
+            </form>
+            <div id="login-error" class="mt-2 text-sm text-red-600 hidden"></div>
+        </div>
+
+        <div id="resource-section" class="hidden mt-6 pt-6 border-t border-gray-200">
+            <h3 class="text-lg font-semibold mb-2 text-green-600">2. Dữ liệu mật (Resource Server)</h3>
+            <p class="text-sm text-gray-600 mb-4">Bạn đang giữ một Access Token hợp lệ.</p>
+            
+            <button id="btn-fetch-data" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
+                Truy cập API Dữ liệu mật
+            </button>
+            
+            <button id="btn-logout" class="mt-3 w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                Xóa Token (Đăng xuất)
+            </button>
+        </div>
+
+        <div class="mt-8 bg-gray-900 rounded-md p-4 overflow-x-auto">
+            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Terminal / Console</h4>
+            <pre id="console-output" class="text-xs text-green-400 whitespace-pre-wrap break-all">Hệ thống sẵn sàng...</pre>
+        </div>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById('login-form');
+        const loginSection = document.getElementById('login-section');
+        const resourceSection = document.getElementById('resource-section');
+        const consoleOutput = document.getElementById('console-output');
+        const loginError = document.getElementById('login-error');
+
+        // Hàm in log ra màn hình đen
+        function log(message, data = null) {
+            let output = `[${new Date().toLocaleTimeString()}] ${message}\n`;
+            if (data) output += JSON.stringify(data, null, 2) + '\n';
+            consoleOutput.textContent = output + '\n' + consoleOutput.textContent;
+        }
+
+        // Kiểm tra xem đã có token trong localStorage chưa
+        function checkAuthState() {
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                loginSection.classList.add('hidden');
+                resourceSection.classList.remove('hidden');
+            } else {
+                loginSection.classList.remove('hidden');
+                resourceSection.classList.add('hidden');
+            }
+        }
+
+        // XỬ LÝ ĐĂNG NHẬP
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            loginError.classList.add('hidden');
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                log('Đang gọi API Login tới Auth Server...');
+                const response = await fetch('http://localhost:3000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Đăng nhập thất bại');
+                }
+
+                // Lưu token vào LocalStorage
+                localStorage.setItem('access_token', data.access_token);
+                log('Đăng nhập thành công! Đã nhận và lưu JWT.', data);
+                checkAuthState();
+
+            } catch (err) {
+                loginError.textContent = err.message;
+                loginError.classList.remove('hidden');
+                log('Lỗi đăng nhập: ' + err.message);
+            }
+        });
+
+        // XỬ LÝ LẤY DỮ LIỆU TỪ RESOURCE SERVER
+        document.getElementById('btn-fetch-data').addEventListener('click', async () => {
+            const token = localStorage.getItem('access_token');
+            if (!token) return;
+
+            try {
+                log('Đang gọi API Dữ liệu tới Resource Server...');
+                log('Header đính kèm -> Authorization: Bearer ' + token.substring(0, 20) + '...');
+
+                const response = await fetch('http://localhost:4000/api/secret-data', {
+                    method: 'GET',
+                    // Đính kèm Token vào Header
+                    headers: { 
+                        'Authorization': `Bearer ${token}` 
+                    }
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    log('TỪ CHỐI TRUY CẬP (401)!', data);
+                    throw new Error(data.error);
+                }
+
+                log('RESOURCE SERVER TRẢ VỀ DỮ LIỆU THÀNH CÔNG!', data);
+
+            } catch (err) {
+                log('Lỗi lấy dữ liệu: ' + err.message);
+            }
+        });
+
+        // XỬ LÝ ĐĂNG XUẤT
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            localStorage.removeItem('access_token');
+            log('Đã xóa JWT khỏi LocalStorage.');
+            checkAuthState();
+        });
+
+        // Khởi tạo giao diện
+        checkAuthState();
+    </script>
+</body>
+</html>
