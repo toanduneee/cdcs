@@ -28,7 +28,7 @@ Chỉ với một lệnh duy nhất, Docker sẽ tự động build image, thi�
 
 Bước 1: Clone repository về máy:
 ```
-git clone [https://github.com/toanduneee/secure-rest-api-jwt-rsa.git](https://github.com/toanduneee/secure-rest-api-jwt-rsa.git)
+git clone https://github.com/toanduneee/secure-rest-api-jwt-rsa.git
 cd secure-rest-api-jwt-rsa
 ```
 
